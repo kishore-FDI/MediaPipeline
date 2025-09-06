@@ -2,24 +2,21 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"mediapipeline/internal/config"
+	"mediapipeline/internal/db"
+	"mediapipeline/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
-// SetupRoutes configures all routes for the application
 func SetupRoutes(r *gin.Engine, cfg *config.Config) {
-	// Add CORS middleware
 	r.Use(corsMiddleware())
-
-	// Health check endpoint
 	r.GET("/health", healthCheck)
 
-	// API v1 routes
 	v1 := r.Group("/api/v1")
 	{
-		// Basic info endpoint
 		v1.GET("/", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"message": "Media Pipeline API",
@@ -28,31 +25,30 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config) {
 			})
 		})
 
-		// Upload routes (to be implemented)
 		uploads := v1.Group("/uploads")
+		uploads.Use(middleware.RateLimiter(db.RDB, 10, time.Minute, middleware.BusinessRateLimit{}))
 		{
-			uploads.POST("/", uploadHandler)           // Start upload
-			uploads.PUT("/:id", resumeUploadHandler)   // Resume upload
-			uploads.GET("/:id/status", statusHandler)  // Get upload status
+			uploads.POST("/", uploadHandler)
+			uploads.PUT("/:id", resumeUploadHandler)
+			uploads.GET("/:id/status", statusHandler)
 		}
 
-		// Storage routes (to be implemented)
 		storage := v1.Group("/storage")
 		{
-			storage.GET("/:id", downloadHandler)       // Download file
-			storage.DELETE("/:id", deleteHandler)      // Delete file
+			storage.GET("/:id", downloadHandler)
+			storage.DELETE("/:id", deleteHandler)
 		}
 
-		// Moderation routes (to be implemented)
 		moderation := v1.Group("/moderation")
 		{
-			moderation.POST("/check", moderationHandler) // Check content
-			moderation.GET("/:id/result", resultHandler) // Get moderation result
+			moderation.POST("/check", moderationHandler)
+			moderation.GET("/:id/result", resultHandler)
 		}
+
+		SetupBusinessRoutes(v1)
 	}
 }
 
-// corsMiddleware adds CORS headers
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
@@ -68,15 +64,13 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-// healthCheck returns the health status of the service
 func healthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"status": "healthy",
+		"status":  "healthy",
 		"service": "Media Pipeline API",
 	})
 }
 
-// Placeholder handlers (to be implemented in separate files)
 func uploadHandler(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, gin.H{"message": "Upload handler not implemented yet"})
 }
